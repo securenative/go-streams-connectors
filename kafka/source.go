@@ -33,15 +33,19 @@ func NewKafkaSource(cfg SourceConfig) *kafkaSource {
 }
 
 func (this *kafkaSource) Start(channel s.EntryChannel, errorChannel s.ErrorChannel) {
+	s.Log().Info("Connecting to kafka with config: %+v", this.cfg)
 	if err := this.connect(); err != nil {
 		panic(err)
 	}
+	s.Log().Info("Connected to kafka with config: %+v", this.cfg)
 
 	defer func() {
+		s.Log().Info("Disconnecting from kafka with config: %+v", this.cfg)
 		errorChannel <- s.NewEofError(this)
 		if err := this.disconnect(); err != nil {
 			panic(err)
 		}
+		s.Log().Info("Disconnected from kafka with config: %+v", this.cfg)
 	}()
 
 loop:

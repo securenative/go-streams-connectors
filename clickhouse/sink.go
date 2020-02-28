@@ -27,13 +27,16 @@ func NewClickhouseSink(cfg Config, table string, mapping RecordMapping) *clickho
 		query:   genInsertQuery(table, mapping),
 		table:   table,
 	}
+	s.Log().Info("Connecting to clickhouse: %s", cfg.ConnectionString())
 	if err := ch.connect(); err != nil {
 		panic(err)
 	}
+	s.Log().Info("Connected to clickhouse: %s", cfg.ConnectionString())
 	return ch
 }
 
 func (this *clickhouseSink) Single(entry s.Entry) error {
+	s.Log().Warn("Clickhouse isn't optimized to single record writes, please consider using a buffered processor")
 	args := entry.Value.(Record)
 	tx, err := this.connection.Begin()
 	if err != nil {

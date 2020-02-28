@@ -9,8 +9,8 @@ github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSs
 github.com/go-sql-driver/mysql v1.4.0/go.mod h1:zAC/RDZ24gD3HViQzih4MyKcchzm+sOG5ZlKdlhCg5w=
 github.com/jmoiron/sqlx v1.2.0/go.mod h1:1FEQNm3xlJgrMD+FBdI9+xvCksHtbpVBBw5dYhBSsks=
 github.com/lib/pq v1.0.0/go.mod h1:5WUZQaWbwv1U+lTReE5YruASi9Al49XbQIvNi/34Woo=
-github.com/matang28/go-streams v0.0.0-20200226132315-7ea2551a7bae h1:IpwSAIW78PbTsz31x/Ler2wp1gJs9FkGSyOWi15vOfA=
-github.com/matang28/go-streams v0.0.0-20200226132315-7ea2551a7bae/go.mod h1:aLZ7+Wt6ySWNn/WFDQH+Bo2uL0IyG1Au8NdjUXZXbI4=
+github.com/matang28/go-streams v0.0.0-20200228083127-b9cf444c3666 h1:NWfCPWv0iLqj0j66zjZEXDxVkrkydV2z0yCPGNvGQPo=
+github.com/matang28/go-streams v0.0.0-20200228083127-b9cf444c3666/go.mod h1:aLZ7+Wt6ySWNn/WFDQH+Bo2uL0IyG1Au8NdjUXZXbI4=
 github.com/mattn/go-sqlite3 v1.9.0/go.mod h1:FPy6KqzDD04eiIsT53CuJW3U88zkxoIYsOqkbpncsNc=
 github.com/pierrec/lz4 v2.0.5+incompatible h1:2xWsjqPFWcplujydGg4WmhC/6fZqK42wMM8aXeqhl0I=
 github.com/pierrec/lz4 v2.0.5+incompatible/go.mod h1:pdkljMzZIN41W+lC3N2tnIh5sFi+IEE17M5jbnwPHcY=

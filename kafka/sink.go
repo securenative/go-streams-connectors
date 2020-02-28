@@ -25,11 +25,11 @@ func NewKafkaSink(cfg SinkConfig, extractor s.KeyExtractor) *kafkaSink {
 	}
 
 	out := &kafkaSink{cfg: cfg, extractor: extractor}
-
+	s.Log().Info("Connecting to kafka with config: %+v", cfg)
 	if err := out.connect(); err != nil {
 		panic(err)
 	}
-
+	s.Log().Info("Connected to kafka with config: %+v", cfg)
 	return out
 }
 
