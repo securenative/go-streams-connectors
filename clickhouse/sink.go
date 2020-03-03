@@ -37,21 +37,32 @@ func NewClickhouseSink(cfg Config, table string, mapping RecordMapping) *clickho
 
 func (this *clickhouseSink) Single(entry s.Entry) error {
 	s.Log().Warn("Clickhouse isn't optimized to single record writes, please consider using a buffered processor")
-	args := entry.Value.(Record)
-	tx, err := this.connection.Begin()
-	if err != nil {
-		return err
+	var commitErr error = nil
+	for i := 0; i < 3; i++ {
+		commitErr = this.commitTx(entry)
+		if commitErr == nil {
+			return nil
+		} else {
+			s.Log().Warn("Failed to commit query to clickhouse(%d/3) with error: %s", i, commitErr.Error())
+		}
 	}
-
-	_, err = tx.Exec(this.query, args...)
-	if err != nil {
-		return err
-	}
-
-	return tx.Commit()
+	return commitErr
 }
 
 func (this *clickhouseSink) Batch(entry ...s.Entry) error {
+	var commitErr error = nil
+	for i := 0; i < 3; i++ {
+		commitErr = this.commitTx(entry...)
+		if commitErr == nil {
+			return nil
+		} else {
+			s.Log().Warn("Failed to commit query to clickhouse(%d/3) with error: %s", i+1, commitErr.Error())
+		}
+	}
+	return commitErr
+}
+
+func (this *clickhouseSink) commitTx(entry ...s.Entry) error {
 	tx, err := this.connection.Begin()
 	if err != nil {
 		return err
@@ -61,6 +72,7 @@ func (this *clickhouseSink) Batch(entry ...s.Entry) error {
 	if err != nil {
 		return err
 	}
+	defer stmt.Close()
 
 	errs := s.NewSinkBatchError()
 	for idx := range entry {
@@ -74,7 +86,13 @@ func (this *clickhouseSink) Batch(entry ...s.Entry) error {
 		return errs.AsError()
 	}
 
-	return tx.Commit()
+	crr := tx.Commit()
+	if crr != nil {
+		if e := tx.Rollback(); e != nil {
+			s.Log().Error(e.Error())
+		}
+	}
+	return crr
 }
 
 func (this *clickhouseSink) Ping() error {
