@@ -19,7 +19,7 @@ func TestMain(m *testing.M) {
 		Password: "",
 		Database: "default",
 		Debug:    true,
-	}, "test", RecordMapping{"timestamp", "name", "likes", "tags"})
+	}, "test", 3, RecordMapping{"timestamp", "name", "likes", "tags"})
 
 	status := m.Run()
 
