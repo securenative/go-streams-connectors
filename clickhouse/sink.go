@@ -16,16 +16,18 @@ type clickhouseSink struct {
 	connection *sql.DB
 	mapping    RecordMapping
 
-	table string
-	query string
+	table   string
+	retries int
+	query   string
 }
 
-func NewClickhouseSink(cfg Config, table string, mapping RecordMapping) *clickhouseSink {
+func NewClickhouseSink(cfg Config, table string, retries int, mapping RecordMapping) *clickhouseSink {
 	ch := &clickhouseSink{
 		cfg:     cfg,
 		mapping: mapping,
 		query:   genInsertQuery(table, mapping),
 		table:   table,
+		retries: retries,
 	}
 	s.Log().Info("Connecting to clickhouse: %s", cfg.ConnectionString())
 	if err := ch.connect(); err != nil {
@@ -38,7 +40,7 @@ func NewClickhouseSink(cfg Config, table string, mapping RecordMapping) *clickho
 func (this *clickhouseSink) Single(entry s.Entry) error {
 	s.Log().Warn("Clickhouse isn't optimized to single record writes, please consider using a buffered processor")
 	var commitErr error = nil
-	for i := 0; i < 3; i++ {
+	for i := 0; i < this.retries; i++ {
 		commitErr = this.commitTx(entry)
 		if commitErr == nil {
 			return nil
@@ -51,7 +53,7 @@ func (this *clickhouseSink) Single(entry s.Entry) error {
 
 func (this *clickhouseSink) Batch(entry ...s.Entry) error {
 	var commitErr error = nil
-	for i := 0; i < 3; i++ {
+	for i := 0; i < this.retries; i++ {
 		commitErr = this.commitTx(entry...)
 		if commitErr == nil {
 			return nil
