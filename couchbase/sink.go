@@ -2,25 +2,27 @@ package couchbase
 
 import (
 	"fmt"
+	"time"
+
 	s "github.com/matang28/go-streams"
 	"gopkg.in/couchbase/gocb.v1"
-	"time"
 )
 
 type WriteMethod int
 
 const (
-	IGNORE  WriteMethod = 1
-	UPSERT  WriteMethod = 2
-	REPLACE WriteMethod = 3
+	IGNORE    WriteMethod = 1
+	UPSERT    WriteMethod = 2
+	REPLACE   WriteMethod = 3
+	N1QLQUERY WriteMethod = 4
 )
 
 type couchbaseSink struct {
 	config SinkConfig
 
-	cluster *gocb.Cluster
-	bucket  *gocb.Bucket
-
+	cluster  *gocb.Cluster
+	bucket   *gocb.Bucket
+	query    string
 	singleCh chan errAndKey
 	batchCh  chan errAndKey
 }
@@ -89,6 +91,12 @@ func (this *couchbaseSink) writeSingle(entry s.Entry, ch chan<- errAndKey) {
 		}
 	case UPSERT:
 		if _, err := this.bucket.Upsert(key, entry.Value, ttl); err != nil {
+			ch <- errAndKey{Key: entry.Key, Error: err}
+			return
+		}
+	case N1QLQUERY:
+		query := gocb.NewN1qlQuery(this.query)
+		if _, err := this.bucket.ExecuteN1qlQuery(query, entry.Value); err != nil {
 			ch <- errAndKey{Key: entry.Key, Error: err}
 			return
 		}
