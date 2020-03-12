@@ -21,14 +21,13 @@ type SinkConfig struct {
 	ExpiryExtractor ExpiryExtractor
 }
 
-func NewSinkConfig(hosts string, username string, password string, bucketPassword string, bucket string, query string) SinkConfig {
+func NewSinkConfig(hosts string, username string, password string, bucketPassword string, bucket string) SinkConfig {
 	out := SinkConfig{
 		Hosts:          hosts,
 		Username:       username,
 		Password:       password,
 		BucketPassword: bucketPassword,
 		Bucket:         bucket,
-		Query:          query,
 	}
 
 	out.WriteMethod = UPSERT

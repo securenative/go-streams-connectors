@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-var testConfig = NewSinkConfig("couchbase://localhost", "Administrator", "123456", "", "test", "")
+var testConfig = NewSinkConfig("couchbase://localhost", "Administrator", "123456", "", "test")
 var sink *couchbaseSink
 var probe = couchbaseSink{config: testConfig}
 
