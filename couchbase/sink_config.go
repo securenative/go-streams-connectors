@@ -13,6 +13,7 @@ type SinkConfig struct {
 	Password       string
 	BucketPassword string
 	Bucket         string
+	Query          string
 	UsedServices   []gocb.ServiceType
 	WriteMethod    WriteMethod
 
@@ -20,13 +21,14 @@ type SinkConfig struct {
 	ExpiryExtractor ExpiryExtractor
 }
 
-func NewSinkConfig(hosts string, username string, password string, bucketPassword string, bucket string) SinkConfig {
+func NewSinkConfig(hosts string, username string, password string, bucketPassword string, bucket string, query string) SinkConfig {
 	out := SinkConfig{
 		Hosts:          hosts,
 		Username:       username,
 		Password:       password,
 		BucketPassword: bucketPassword,
 		Bucket:         bucket,
+		Query:          query,
 	}
 
 	out.WriteMethod = UPSERT
