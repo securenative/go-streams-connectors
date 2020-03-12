@@ -22,13 +22,16 @@ type couchbaseSink struct {
 
 	cluster  *gocb.Cluster
 	bucket   *gocb.Bucket
-	query    string
 	singleCh chan errAndKey
 	batchCh  chan errAndKey
 }
 
 func NewCouchbaseSink(config SinkConfig) *couchbaseSink {
-	out := &couchbaseSink{config: config, singleCh: make(chan errAndKey, 1), batchCh: make(chan errAndKey)}
+	out := &couchbaseSink{
+		config:   config,
+		singleCh: make(chan errAndKey, 1),
+		batchCh:  make(chan errAndKey),
+	}
 	if err := out.connect(); err != nil {
 		panic(err)
 	}
@@ -95,7 +98,7 @@ func (this *couchbaseSink) writeSingle(entry s.Entry, ch chan<- errAndKey) {
 			return
 		}
 	case N1QLQUERY:
-		query := gocb.NewN1qlQuery(this.query)
+		query := gocb.NewN1qlQuery(this.config.Query)
 		if _, err := this.bucket.ExecuteN1qlQuery(query, entry.Value); err != nil {
 			ch <- errAndKey{Key: entry.Key, Error: err}
 			return

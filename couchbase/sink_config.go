@@ -13,6 +13,7 @@ type SinkConfig struct {
 	Password       string
 	BucketPassword string
 	Bucket         string
+	Query          string
 	UsedServices   []gocb.ServiceType
 	WriteMethod    WriteMethod
 
