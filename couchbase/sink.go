@@ -22,6 +22,7 @@ type couchbaseSink struct {
 
 	cluster  *gocb.Cluster
 	bucket   *gocb.Bucket
+	query    *gocb.N1qlQuery
 	singleCh chan errAndKey
 	batchCh  chan errAndKey
 }
@@ -32,6 +33,13 @@ func NewCouchbaseSink(config SinkConfig) *couchbaseSink {
 		singleCh: make(chan errAndKey, 1),
 		batchCh:  make(chan errAndKey),
 	}
+
+	if config.Query != "" {
+		out.query = gocb.NewN1qlQuery(config.Query)
+		out.query.AdHoc(false) // optimize the query on server
+		out.query.Consistency(config.QueryConsistency)
+	}
+
 	if err := out.connect(); err != nil {
 		panic(err)
 	}
@@ -98,8 +106,11 @@ func (this *couchbaseSink) writeSingle(entry s.Entry, ch chan<- errAndKey) {
 			return
 		}
 	case N1QLQUERY:
-		query := gocb.NewN1qlQuery(this.config.Query)
-		if _, err := this.bucket.ExecuteN1qlQuery(query, entry.Value); err != nil {
+		err := this.executeWithRetries(func() error {
+			_, err := this.bucket.ExecuteN1qlQuery(this.query, entry.Value)
+			return err
+		})
+		if err != nil {
 			ch <- errAndKey{Key: entry.Key, Error: err}
 			return
 		}
@@ -156,6 +167,24 @@ func (this *couchbaseSink) connect() error {
 
 	return this.Ping()
 }
+
+func (this *couchbaseSink) executeWithRetries(fn RetryFunc) error {
+	var err error
+	maxRetries := this.config.MaxRetries
+
+	for i := 0; i < maxRetries; i++ {
+		err = fn()
+		if err == nil {
+			return nil
+		}
+
+		time.Sleep(this.config.RetryTimeout)
+	}
+
+	return err
+}
+
+type RetryFunc func() error
 
 type errAndKey struct {
 	Error error
