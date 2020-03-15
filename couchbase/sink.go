@@ -2,31 +2,44 @@ package couchbase
 
 import (
 	"fmt"
+	"time"
+
 	s "github.com/matang28/go-streams"
 	"gopkg.in/couchbase/gocb.v1"
-	"time"
 )
 
 type WriteMethod int
 
 const (
-	IGNORE  WriteMethod = 1
-	UPSERT  WriteMethod = 2
-	REPLACE WriteMethod = 3
+	IGNORE    WriteMethod = 1
+	UPSERT    WriteMethod = 2
+	REPLACE   WriteMethod = 3
+	N1QLQUERY WriteMethod = 4
 )
 
 type couchbaseSink struct {
 	config SinkConfig
 
-	cluster *gocb.Cluster
-	bucket  *gocb.Bucket
-
+	cluster  *gocb.Cluster
+	bucket   *gocb.Bucket
+	query    *gocb.N1qlQuery
 	singleCh chan errAndKey
 	batchCh  chan errAndKey
 }
 
 func NewCouchbaseSink(config SinkConfig) *couchbaseSink {
-	out := &couchbaseSink{config: config, singleCh: make(chan errAndKey, 1), batchCh: make(chan errAndKey)}
+	out := &couchbaseSink{
+		config:   config,
+		singleCh: make(chan errAndKey, 1),
+		batchCh:  make(chan errAndKey),
+	}
+
+	if config.Query != "" {
+		out.query = gocb.NewN1qlQuery(config.Query)
+		out.query.AdHoc(false) // optimize the query on server
+		out.query.Consistency(config.QueryConsistency)
+	}
+
 	if err := out.connect(); err != nil {
 		panic(err)
 	}
@@ -83,17 +96,38 @@ func (this *couchbaseSink) writeSingle(entry s.Entry, ch chan<- errAndKey) {
 
 	switch this.config.WriteMethod {
 	case IGNORE:
-		if _, err := this.bucket.Insert(key, entry.Value, ttl); err != nil {
+		err := this.executeWithRetries(func() error {
+			_, err := this.bucket.Insert(key, entry.Value, ttl)
+			return err
+		})
+		if err != nil {
 			ch <- errAndKey{Key: entry.Key, Error: err}
 			return
 		}
 	case UPSERT:
-		if _, err := this.bucket.Upsert(key, entry.Value, ttl); err != nil {
+		err := this.executeWithRetries(func() error {
+			_, err := this.bucket.Upsert(key, entry.Value, ttl)
+			return err
+		})
+		if err != nil {
+			ch <- errAndKey{Key: entry.Key, Error: err}
+			return
+		}
+	case N1QLQUERY:
+		err := this.executeWithRetries(func() error {
+			_, err := this.bucket.ExecuteN1qlQuery(this.query, entry.Value)
+			return err
+		})
+		if err != nil {
 			ch <- errAndKey{Key: entry.Key, Error: err}
 			return
 		}
 	case REPLACE:
-		if _, err := this.bucket.Replace(key, entry.Value, 0, ttl); err != nil {
+		err := this.executeWithRetries(func() error {
+			_, err := this.bucket.Replace(key, entry.Value, 0, ttl)
+			return err
+		})
+		if err != nil {
 			ch <- errAndKey{Key: entry.Key, Error: err}
 			return
 		}
@@ -145,6 +179,27 @@ func (this *couchbaseSink) connect() error {
 
 	return this.Ping()
 }
+
+func (this *couchbaseSink) executeWithRetries(fn RetryFunc) error {
+	var err error
+	maxRetries := this.config.MaxRetries
+
+	for i := 0; i < maxRetries; i++ {
+		err = fn()
+		if err == nil {
+			return nil
+		} else {
+			s.Log().Warn("Failed to execute query against couchbase (%d/%d), failed with error: %s",
+				i, this.config.RetryTimeout, err.Error())
+		}
+
+		time.Sleep(this.config.RetryTimeout * time.Duration(i))
+	}
+
+	return err
+}
+
+type RetryFunc func() error
 
 type errAndKey struct {
 	Error error

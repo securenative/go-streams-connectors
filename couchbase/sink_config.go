@@ -1,6 +1,8 @@
 package couchbase
 
 import (
+	"time"
+
 	s "github.com/matang28/go-streams"
 	"gopkg.in/couchbase/gocb.v1"
 )
@@ -8,13 +10,17 @@ import (
 type ExpiryExtractor func(entry s.Entry) (ttlSeconds uint32)
 
 type SinkConfig struct {
-	Hosts          string
-	Username       string
-	Password       string
-	BucketPassword string
-	Bucket         string
-	UsedServices   []gocb.ServiceType
-	WriteMethod    WriteMethod
+	Hosts            string
+	Username         string
+	Password         string
+	BucketPassword   string
+	Bucket           string
+	Query            string
+	QueryConsistency gocb.ConsistencyMode
+	MaxRetries       int
+	RetryTimeout     time.Duration
+	UsedServices     []gocb.ServiceType
+	WriteMethod      WriteMethod
 
 	KeyExtractor    s.KeyExtractor
 	ExpiryExtractor ExpiryExtractor
@@ -22,11 +28,14 @@ type SinkConfig struct {
 
 func NewSinkConfig(hosts string, username string, password string, bucketPassword string, bucket string) SinkConfig {
 	out := SinkConfig{
-		Hosts:          hosts,
-		Username:       username,
-		Password:       password,
-		BucketPassword: bucketPassword,
-		Bucket:         bucket,
+		Hosts:            hosts,
+		Username:         username,
+		Password:         password,
+		BucketPassword:   bucketPassword,
+		Bucket:           bucket,
+		QueryConsistency: gocb.RequestPlus,
+		MaxRetries:       5,
+		RetryTimeout:     10 * time.Millisecond,
 	}
 
 	out.WriteMethod = UPSERT
