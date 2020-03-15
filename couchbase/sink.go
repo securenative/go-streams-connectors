@@ -193,7 +193,7 @@ func (this *couchbaseSink) executeWithRetries(fn RetryFunc) error {
 				i, this.config.RetryTimeout, err.Error())
 		}
 
-		time.Sleep(this.config.RetryTimeout * time.Duration(i))
+		time.Sleep(this.config.RetryTimeout * time.Duration(i+1))
 	}
 
 	return err
