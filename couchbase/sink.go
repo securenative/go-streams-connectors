@@ -96,12 +96,20 @@ func (this *couchbaseSink) writeSingle(entry s.Entry, ch chan<- errAndKey) {
 
 	switch this.config.WriteMethod {
 	case IGNORE:
-		if _, err := this.bucket.Insert(key, entry.Value, ttl); err != nil {
+		err := this.executeWithRetries(func() error {
+			_, err := this.bucket.Insert(key, entry.Value, ttl)
+			return err
+		})
+		if err != nil {
 			ch <- errAndKey{Key: entry.Key, Error: err}
 			return
 		}
 	case UPSERT:
-		if _, err := this.bucket.Upsert(key, entry.Value, ttl); err != nil {
+		err := this.executeWithRetries(func() error {
+			_, err := this.bucket.Upsert(key, entry.Value, ttl)
+			return err
+		})
+		if err != nil {
 			ch <- errAndKey{Key: entry.Key, Error: err}
 			return
 		}
@@ -115,7 +123,11 @@ func (this *couchbaseSink) writeSingle(entry s.Entry, ch chan<- errAndKey) {
 			return
 		}
 	case REPLACE:
-		if _, err := this.bucket.Replace(key, entry.Value, 0, ttl); err != nil {
+		err := this.executeWithRetries(func() error {
+			_, err := this.bucket.Replace(key, entry.Value, 0, ttl)
+			return err
+		})
+		if err != nil {
 			ch <- errAndKey{Key: entry.Key, Error: err}
 			return
 		}
@@ -176,9 +188,12 @@ func (this *couchbaseSink) executeWithRetries(fn RetryFunc) error {
 		err = fn()
 		if err == nil {
 			return nil
+		} else {
+			s.Log().Warn("Failed to execute query against couchbase (%d/%d), failed with error: %s",
+				i, this.config.RetryTimeout, err.Error())
 		}
 
-		time.Sleep(this.config.RetryTimeout)
+		time.Sleep(this.config.RetryTimeout * time.Duration(i))
 	}
 
 	return err
