@@ -59,10 +59,7 @@ loop:
 			if err != nil {
 				handleError(err, errorChannel)
 			} else {
-				entry := s.Entry{
-					Key:   fmt.Sprintf("%d-%s", m.Offset, m.Key),
-					Value: m.Value,
-				}
+				entry := this.cfg.ConfiguredOutputEntryFunc(m)
 				this.uncommittedMessages[entry.Key] = m
 				channel <- entry
 			}
