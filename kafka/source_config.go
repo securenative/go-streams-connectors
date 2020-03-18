@@ -106,7 +106,7 @@ type SourceConfig struct {
 
 	// Enables the caller to choose what the output entry will be after the message was received.
 	//
-	// The default is ValueOutputEntryFunc to preserve backward computability
+	// The default is ValueEntryFunc to preserve backward computability
 	ValueExtractor ValueExtractorFunc
 }
 
