@@ -59,7 +59,7 @@ loop:
 			if err != nil {
 				handleError(err, errorChannel)
 			} else {
-				entry := this.cfg.ConfiguredOutputEntryFunc(m)
+				entry := this.cfg.ValueExtractor(m)
 				this.uncommittedMessages[entry.Key] = m
 				channel <- entry
 			}
