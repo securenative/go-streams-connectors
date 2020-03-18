@@ -107,7 +107,7 @@ type SourceConfig struct {
 	// Enables the caller to choose what the output entry will be after the message was received.
 	//
 	// The default is ValueOutputEntryFunc to preserve backward computability
-	ConfiguredOutputEntryFunc OutputEntryFunc
+	ValueExtractor ValueExtractorFunc
 }
 
 func NewSourceConfig(hosts []string, topic string, consumerGroupId string) SourceConfig {
@@ -129,15 +129,15 @@ func NewSourceConfig(hosts []string, topic string, consumerGroupId string) Sourc
 	out.ReadBackoffMinMs = 100
 	out.ReadBackoffMaxMs = 1000
 	out.MaxAttempts = 5
-	out.ConfiguredOutputEntryFunc = ValueOutputEntryFunc
+	out.ValueExtractor = ValueEntryFunc
 	return out
 }
 
 // define the OutputEntryFunc options
-type OutputEntryFunc = func(k.Message) s.Entry
+type ValueExtractorFunc = func(k.Message) s.Entry
 var (
 	// default
-	ValueOutputEntryFunc OutputEntryFunc = func(m k.Message) s.Entry {
+	ValueEntryFunc = func(m k.Message) s.Entry {
 		return s.Entry{
 			Key:   fmt.Sprintf("%d-%s", m.Offset, m.Key),
 			Value: m.Value,
@@ -145,7 +145,7 @@ var (
 	}
 
 	// can provide all the message parameters when needed
-	MessageOutputEntryFunc OutputEntryFunc = func(m k.Message) s.Entry {
+	MessageEntryFunc = func(m k.Message) s.Entry {
 		return s.Entry{
 			Key:   fmt.Sprintf("%d-%s", m.Offset, m.Key),
 			Value: m,
