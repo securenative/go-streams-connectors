@@ -63,9 +63,11 @@ loop:
 				handleError(err, errorChannel)
 			} else {
 				entry := this.cfg.ValueExtractor(m)
-				this.mutex.Lock()
-				this.uncommittedMessages[entry.Key] = m
-				this.mutex.Unlock()
+				if this.cfg.ConsumerGroup != "" {
+					this.mutex.Lock()
+					this.uncommittedMessages[entry.Key] = m
+					this.mutex.Unlock()
+				}
 				channel <- entry
 			}
 		}
@@ -93,6 +95,10 @@ func (this *kafkaSource) Stop() error {
 }
 
 func (this *kafkaSource) CommitEntry(keys ...string) error {
+	if this.cfg.ConsumerGroup == "" {
+		return nil
+	}
+
 	messages := make([]k.Message, len(keys))
 	for _, key := range keys {
 		m, found := this.uncommittedMessages[key]
