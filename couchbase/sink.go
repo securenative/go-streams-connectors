@@ -36,7 +36,7 @@ func NewCouchbaseSink(config SinkConfig) *couchbaseSink {
 
 	if config.Query != "" {
 		out.query = gocb.NewN1qlQuery(config.Query)
-		out.query.AdHoc(false) // optimize the query on server
+		out.query.AdHoc(config.QueryAdHoc)
 		out.query.Consistency(config.QueryConsistency)
 	}
 
