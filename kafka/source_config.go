@@ -125,7 +125,7 @@ func NewSourceConfig(hosts []string, topic string, consumerGroupId string) Sourc
 	out.SessionTimeoutSec = 30
 	out.RebalanceTimeoutSec = 30
 	out.JoinGroupBackoffSec = 5
-	out.StartOffset = -2
+	out.StartOffset = k.LastOffset
 	out.ReadBackoffMinMs = 100
 	out.ReadBackoffMaxMs = 1000
 	out.MaxAttempts = 5
@@ -135,6 +135,7 @@ func NewSourceConfig(hosts []string, topic string, consumerGroupId string) Sourc
 
 // define the OutputEntryFunc options
 type ValueExtractorFunc = func(k.Message) s.Entry
+
 var (
 	// default
 	ValueEntryFunc = func(m k.Message) s.Entry {
