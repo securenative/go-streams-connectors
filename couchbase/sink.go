@@ -182,7 +182,10 @@ func (this *couchbaseSink) connect() error {
 
 func (this *couchbaseSink) executeWithRetries(fn RetryFunc) error {
 	var err error
-	maxRetries := this.config.MaxRetries
+	var maxRetries = 1
+	if this.config.MaxRetries > 0 {
+		maxRetries = this.config.MaxRetries
+	}
 
 	for i := 0; i < maxRetries; i++ {
 		err = fn()
