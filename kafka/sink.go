@@ -24,6 +24,12 @@ func NewKafkaSink(cfg SinkConfig, extractor s.KeyExtractor) *kafkaSink {
 		}
 	}
 
+	if cfg.Serializer == nil {
+		cfg.Serializer = func(entry s.Entry) []byte {
+			return entry.Value.([]byte)
+		}
+	}
+
 	out := &kafkaSink{cfg: cfg, extractor: extractor}
 	s.Log().Info("Connecting to kafka with config: %+v", cfg)
 	if err := out.connect(); err != nil {
@@ -36,7 +42,7 @@ func NewKafkaSink(cfg SinkConfig, extractor s.KeyExtractor) *kafkaSink {
 func (this *kafkaSink) Single(entry s.Entry) error {
 	return this.writer.WriteMessages(context.Background(), k.Message{
 		Key:   []byte(this.extractor(entry)),
-		Value: entry.Value.([]byte),
+		Value: this.cfg.Serializer(entry),
 	})
 }
 

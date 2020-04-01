@@ -1,5 +1,7 @@
 package kafka
 
+import go_streams "github.com/matang28/go-streams"
+
 type SinkConfig struct {
 	Hosts []string
 	Topic string
@@ -33,6 +35,8 @@ type SinkConfig struct {
 	// the returned value. Use this only if you don't care about guarantees of
 	// whether the messages were written to kafka.
 	Async bool
+
+	Serializer func(entry go_streams.Entry) []byte
 }
 
 func NewSinkConfig(hosts []string, topic string) SinkConfig {
