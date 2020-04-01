@@ -51,7 +51,7 @@ func (this *kafkaSink) Batch(entry ...s.Entry) error {
 	for idx := range entry {
 		messages[idx] = k.Message{
 			Key:   []byte(this.extractor(entry[idx])),
-			Value: entry[idx].Value.([]byte),
+			Value: this.cfg.Serializer(entry[idx]),
 		}
 	}
 	return this.writer.WriteMessages(context.Background(), messages...)
