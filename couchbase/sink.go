@@ -23,6 +23,7 @@ type couchbaseSink struct {
 	cluster  *gocb.Cluster
 	bucket   *gocb.Bucket
 	query    *gocb.N1qlQuery
+	timeout  time.Duration
 	singleCh chan errAndKey
 	batchCh  chan errAndKey
 }
@@ -32,6 +33,7 @@ func NewCouchbaseSink(config SinkConfig) *couchbaseSink {
 		config:   config,
 		singleCh: make(chan errAndKey, 1),
 		batchCh:  make(chan errAndKey),
+		timeout:  (time.Duration(config.MaxRetries) * (time.Duration(2*config.RetryTimeout) + time.Duration(config.MaxRetries-1)*config.RetryTimeout)) / 2,
 	}
 
 	if config.Query != "" {
@@ -56,7 +58,7 @@ func (this *couchbaseSink) Single(entry s.Entry) error {
 			} else {
 				return nil
 			}
-		case <-time.After(1 * time.Second):
+		case <-time.After(this.timeout):
 			return s.NewSinkError(fmt.Errorf("timeout when trying to write entry: %+v to couchbase", entry))
 		}
 	}
@@ -74,7 +76,7 @@ func (this *couchbaseSink) Batch(entry ...s.Entry) error {
 		case err := <-this.batchCh:
 			successes[err.Key] = true
 			errs.Add(err.Key, err.Error)
-		case <-time.After(1 * time.Second):
+		case <-time.After(this.timeout):
 			continue
 		}
 	}
