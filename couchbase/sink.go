@@ -33,8 +33,12 @@ func NewCouchbaseSink(config SinkConfig) *couchbaseSink {
 		config:   config,
 		singleCh: make(chan errAndKey, 1),
 		batchCh:  make(chan errAndKey),
-		timeout:  (time.Duration(config.MaxRetries) * (time.Duration(2*config.RetryTimeout) + time.Duration(config.MaxRetries-1)*config.RetryTimeout)) / 2,
 	}
+
+	// get max execution time with retries and operation timeout
+	a1 := config.Timeout + config.RetryTimeout
+	an := a1 + time.Duration(config.MaxRetries-1)*config.RetryTimeout
+	out.timeout = ((a1 + an) * time.Duration(config.MaxRetries)) / 2
 
 	if config.Query != "" {
 		out.query = gocb.NewN1qlQuery(config.Query)
