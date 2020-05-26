@@ -1,4 +1,4 @@
-module github.com/matang28/go-streams-connectors/kafka
+module securenative/go-streams-connectors/kafka
 
 go 1.11
 
