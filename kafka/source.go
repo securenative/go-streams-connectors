@@ -7,6 +7,7 @@ import (
 	k "github.com/segmentio/kafka-go"
 	"io"
 	"net"
+	"sync"
 	"time"
 )
 
@@ -20,6 +21,7 @@ type kafkaSource struct {
 
 	uncommittedMessages map[string]k.Message
 	closeCh             chan bool
+	mutex               sync.Mutex
 }
 
 func NewKafkaSource(cfg SourceConfig) *kafkaSource {
@@ -29,6 +31,7 @@ func NewKafkaSource(cfg SourceConfig) *kafkaSource {
 		name:                name,
 		uncommittedMessages: make(map[string]k.Message),
 		closeCh:             make(chan bool),
+		mutex:               sync.Mutex{},
 	}
 }
 
@@ -59,11 +62,12 @@ loop:
 			if err != nil {
 				handleError(err, errorChannel)
 			} else {
-				entry := s.Entry{
-					Key:   fmt.Sprintf("%d-%s", m.Offset, m.Key),
-					Value: m.Value,
+				entry := this.cfg.ValueExtractor(m)
+				if this.cfg.ConsumerGroup != "" {
+					this.mutex.Lock()
+					this.uncommittedMessages[entry.Key] = m
+					this.mutex.Unlock()
 				}
-				this.uncommittedMessages[entry.Key] = m
 				channel <- entry
 			}
 		}
@@ -91,13 +95,19 @@ func (this *kafkaSource) Stop() error {
 }
 
 func (this *kafkaSource) CommitEntry(keys ...string) error {
+	if this.cfg.ConsumerGroup == "" {
+		return nil
+	}
+
 	messages := make([]k.Message, len(keys))
 	for _, key := range keys {
 		m, found := this.uncommittedMessages[key]
 		if found {
 			messages = append(messages, m)
 		}
+		this.mutex.Lock()
 		delete(this.uncommittedMessages, key)
+		this.mutex.Unlock()
 	}
 	return this.reader.CommitMessages(context.Background(), messages...)
 }

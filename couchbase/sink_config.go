@@ -17,8 +17,10 @@ type SinkConfig struct {
 	Bucket           string
 	Query            string
 	QueryConsistency gocb.ConsistencyMode
+	QueryAdHoc       bool
 	MaxRetries       int
 	RetryTimeout     time.Duration
+	Timeout          time.Duration
 	UsedServices     []gocb.ServiceType
 	WriteMethod      WriteMethod
 
@@ -34,8 +36,10 @@ func NewSinkConfig(hosts string, username string, password string, bucketPasswor
 		BucketPassword:   bucketPassword,
 		Bucket:           bucket,
 		QueryConsistency: gocb.RequestPlus,
+		QueryAdHoc:       true,
 		MaxRetries:       5,
 		RetryTimeout:     10 * time.Millisecond,
+		Timeout:          1 * time.Second,
 	}
 
 	out.WriteMethod = UPSERT

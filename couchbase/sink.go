@@ -23,6 +23,7 @@ type couchbaseSink struct {
 	cluster  *gocb.Cluster
 	bucket   *gocb.Bucket
 	query    *gocb.N1qlQuery
+	timeout  time.Duration
 	singleCh chan errAndKey
 	batchCh  chan errAndKey
 }
@@ -34,9 +35,14 @@ func NewCouchbaseSink(config SinkConfig) *couchbaseSink {
 		batchCh:  make(chan errAndKey),
 	}
 
+	// get max execution time with retries and operation timeout
+	a1 := config.Timeout + config.RetryTimeout
+	an := a1 + time.Duration(config.MaxRetries-1)*config.RetryTimeout
+	out.timeout = ((a1 + an) * time.Duration(config.MaxRetries)) / 2
+
 	if config.Query != "" {
 		out.query = gocb.NewN1qlQuery(config.Query)
-		out.query.AdHoc(false) // optimize the query on server
+		out.query.AdHoc(config.QueryAdHoc)
 		out.query.Consistency(config.QueryConsistency)
 	}
 
@@ -56,7 +62,7 @@ func (this *couchbaseSink) Single(entry s.Entry) error {
 			} else {
 				return nil
 			}
-		case <-time.After(1 * time.Second):
+		case <-time.After(this.timeout):
 			return s.NewSinkError(fmt.Errorf("timeout when trying to write entry: %+v to couchbase", entry))
 		}
 	}
@@ -74,7 +80,7 @@ func (this *couchbaseSink) Batch(entry ...s.Entry) error {
 		case err := <-this.batchCh:
 			successes[err.Key] = true
 			errs.Add(err.Key, err.Error)
-		case <-time.After(1 * time.Second):
+		case <-time.After(this.timeout):
 			continue
 		}
 	}
@@ -182,7 +188,10 @@ func (this *couchbaseSink) connect() error {
 
 func (this *couchbaseSink) executeWithRetries(fn RetryFunc) error {
 	var err error
-	maxRetries := this.config.MaxRetries
+	var maxRetries = 1
+	if this.config.MaxRetries > 0 {
+		maxRetries = this.config.MaxRetries
+	}
 
 	for i := 0; i < maxRetries; i++ {
 		err = fn()
@@ -193,7 +202,7 @@ func (this *couchbaseSink) executeWithRetries(fn RetryFunc) error {
 				i, this.config.RetryTimeout, err.Error())
 		}
 
-		time.Sleep(this.config.RetryTimeout * time.Duration(i))
+		time.Sleep(this.config.RetryTimeout * time.Duration(i+1))
 	}
 
 	return err
