@@ -1,4 +1,4 @@
-module securenative/go-streams-connectors/clickhouse
+module github.com/securenative/go-streams-connectors/clickhouse
 
 go 1.11
 

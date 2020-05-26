@@ -1,4 +1,4 @@
-module securenative/go-streams-connectors/couchbase
+module github.com/securenative/go-streams-connectors/couchbase
 
 go 1.11
 

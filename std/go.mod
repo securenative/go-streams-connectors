@@ -1,4 +1,4 @@
-module securenative/go-streams-connectors/std
+module github.com/securenative/go-streams-connectors/std
 
 go 1.11
 
