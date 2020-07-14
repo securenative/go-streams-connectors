@@ -135,6 +135,7 @@ func (this *kafkaSource) Ping() error {
 
 func (this *kafkaSource) connect() error {
 	this.reader = k.NewReader(k.ReaderConfig{
+		Dialer:                 this.cfg.Dialer,
 		Brokers:                this.cfg.Hosts,
 		Topic:                  this.cfg.Topic,
 		GroupID:                this.cfg.ConsumerGroup,

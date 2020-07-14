@@ -1,5 +1,7 @@
 package kafka
 
+import "github.com/segmentio/kafka-go"
+
 type SourceConfig struct {
 	Hosts []string
 	Topic string
@@ -97,6 +99,8 @@ type SourceConfig struct {
 	//
 	// The default is to try 5 times.
 	MaxAttempts int
+
+	Dialer *kafka.Dialer
 }
 
 func NewSourceConfig(hosts []string, topic string, consumerGroupId string) SourceConfig {
