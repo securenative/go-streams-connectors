@@ -69,8 +69,28 @@ func (this *couchbaseSink) Single(entry s.Entry) error {
 }
 
 func (this *couchbaseSink) Batch(entry ...s.Entry) error {
-	for idx := range entry {
-		go this.writeSingle(entry[idx], this.batchCh)
+	if this.config.GroupByKey {
+		m := make(map[string][]s.Entry)
+		for _, item := range entry {
+			key := this.config.KeyExtractor(item)
+			//init array per key
+			if _, exists := m[key]; !exists {
+				m[key] = []s.Entry{}
+			}
+			m[key] = append(m[key], item)
+		}
+
+		for _, values := range m {
+			go func(items []s.Entry) {
+				for _, item := range items {
+					this.writeSingle(item, this.batchCh)
+				}
+			}(values)
+		}
+	} else {
+		for idx := range entry {
+			go this.writeSingle(entry[idx], this.batchCh)
+		}
 	}
 
 	successes := make(map[string]bool)

@@ -18,6 +18,7 @@ type SinkConfig struct {
 	Query            string
 	QueryConsistency gocb.ConsistencyMode
 	QueryAdHoc       bool
+	GroupByKey       bool
 	MaxRetries       int
 	RetryTimeout     time.Duration
 	Timeout          time.Duration
@@ -37,6 +38,7 @@ func NewSinkConfig(hosts string, username string, password string, bucketPasswor
 		Bucket:           bucket,
 		QueryConsistency: gocb.RequestPlus,
 		QueryAdHoc:       true,
+		GroupByKey:       false,
 		MaxRetries:       5,
 		RetryTimeout:     10 * time.Millisecond,
 		Timeout:          1 * time.Second,
