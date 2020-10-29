@@ -2,6 +2,7 @@ package couchbase
 
 import (
 	"fmt"
+	"github.com/couchbase/gocb/v2"
 	"os"
 	"os/exec"
 	"testing"
@@ -14,6 +15,7 @@ var probe = couchbaseSink{config: testConfig}
 
 func TestMain(m *testing.M) {
 	startCouchbase()
+	testConfig.Timeout = 30 * time.Second
 	sink = NewCouchbaseSink(testConfig)
 	status := m.Run()
 	panicOrPrint(run("docker rm --force cb_test || true"))
@@ -36,7 +38,9 @@ func startCouchbase() {
 }
 
 func read(key string, modelPtr interface{}) {
-	_, err := probe.bucket.Get(key, modelPtr)
+	res, err := probe.bucket.DefaultCollection().Get(key, &gocb.GetOptions{Timeout: time.Second})
+	panicOnErr(err)
+	err = res.Content(modelPtr)
 	panicOnErr(err)
 }
 

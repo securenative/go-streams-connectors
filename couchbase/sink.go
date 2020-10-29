@@ -2,19 +2,21 @@ package couchbase
 
 import (
 	"fmt"
+	"github.com/couchbase/gocb/v2"
+	"github.com/pkg/errors"
 	"time"
 
 	s "github.com/matang28/go-streams"
-	"gopkg.in/couchbase/gocb.v1"
 )
 
 type WriteMethod int
 
 const (
-	IGNORE    WriteMethod = 1
-	UPSERT    WriteMethod = 2
-	REPLACE   WriteMethod = 3
-	N1QLQUERY WriteMethod = 4
+	IGNORE           WriteMethod = 1
+	UPSERT           WriteMethod = 2
+	REPLACE          WriteMethod = 3
+	N1QLQUERY        WriteMethod = 4 // on this case you must pass the object as map
+	MUTATE_OR_INSERT WriteMethod = 5
 )
 
 type couchbaseSink struct {
@@ -22,7 +24,6 @@ type couchbaseSink struct {
 
 	cluster  *gocb.Cluster
 	bucket   *gocb.Bucket
-	query    *gocb.N1qlQuery
 	timeout  time.Duration
 	singleCh chan errAndKey
 	batchCh  chan errAndKey
@@ -39,12 +40,6 @@ func NewCouchbaseSink(config SinkConfig) *couchbaseSink {
 	a1 := config.Timeout + config.RetryTimeout
 	an := a1 + time.Duration(config.MaxRetries-1)*config.RetryTimeout
 	out.timeout = ((a1 + an) * time.Duration(config.MaxRetries)) / 2
-
-	if config.Query != "" {
-		out.query = gocb.NewN1qlQuery(config.Query)
-		out.query.AdHoc(config.QueryAdHoc)
-		out.query.Consistency(config.QueryConsistency)
-	}
 
 	if err := out.connect(); err != nil {
 		panic(err)
@@ -118,12 +113,13 @@ func (this *couchbaseSink) Batch(entry ...s.Entry) error {
 
 func (this *couchbaseSink) writeSingle(entry s.Entry, ch chan<- errAndKey) {
 	key := this.config.KeyExtractor(entry)
-	ttl := this.config.ExpiryExtractor(entry)
+	expiry := this.config.ExpiryExtractor(entry)
 
 	switch this.config.WriteMethod {
 	case IGNORE:
+		opts := &gocb.InsertOptions{Expiry: expiry, Timeout: this.config.Timeout}
 		err := this.executeWithRetries(func() error {
-			_, err := this.bucket.Insert(key, entry.Value, ttl)
+			_, err := this.bucket.DefaultCollection().Insert(key, entry.Value, opts)
 			return err
 		})
 		if err != nil {
@@ -131,8 +127,9 @@ func (this *couchbaseSink) writeSingle(entry s.Entry, ch chan<- errAndKey) {
 			return
 		}
 	case UPSERT:
+		opts := &gocb.UpsertOptions{Expiry: expiry, Timeout: this.config.Timeout}
 		err := this.executeWithRetries(func() error {
-			_, err := this.bucket.Upsert(key, entry.Value, ttl)
+			_, err := this.bucket.DefaultCollection().Upsert(key, entry.Value, opts)
 			return err
 		})
 		if err != nil {
@@ -140,8 +137,14 @@ func (this *couchbaseSink) writeSingle(entry s.Entry, ch chan<- errAndKey) {
 			return
 		}
 	case N1QLQUERY:
+		opts := &gocb.QueryOptions{
+			NamedParameters: entry.Value.(map[string]interface{}),
+			Adhoc:           this.config.QueryAdHoc,
+			ScanConsistency: this.config.QueryConsistency,
+			Timeout:         this.config.Timeout,
+		}
 		err := this.executeWithRetries(func() error {
-			_, err := this.bucket.ExecuteN1qlQuery(this.query, entry.Value)
+			_, err := this.cluster.Query(this.config.Query, opts)
 			return err
 		})
 		if err != nil {
@@ -149,8 +152,28 @@ func (this *couchbaseSink) writeSingle(entry s.Entry, ch chan<- errAndKey) {
 			return
 		}
 	case REPLACE:
+		opts := &gocb.ReplaceOptions{Cas: 0, Expiry: expiry, Timeout: this.config.Timeout}
 		err := this.executeWithRetries(func() error {
-			_, err := this.bucket.Replace(key, entry.Value, 0, ttl)
+			_, err := this.bucket.DefaultCollection().Replace(key, entry.Value, opts)
+			return err
+		})
+		if err != nil {
+			ch <- errAndKey{Key: entry.Key, Error: err}
+			return
+		}
+	case MUTATE_OR_INSERT:
+		mutateOpts := &gocb.MutateInOptions{Timeout: this.config.Timeout}
+		insertOpts := &gocb.InsertOptions{Expiry: expiry, Timeout: this.config.Timeout}
+		err := this.executeWithRetries(func() error {
+			mutateOps, insertObject, err := this.config.MutateOpsExtractor(entry)
+			if err != nil {
+				return errors.Wrap(err, "failed to extract ops during mutation")
+			}
+			_, err = this.bucket.DefaultCollection().MutateIn(key, mutateOps, mutateOpts)
+			if err != nil && errors.Is(err, gocb.ErrDocumentNotFound) {
+				// do an insert if the key does not exists
+				_, err = this.bucket.DefaultCollection().Insert(key, insertObject, insertOpts)
+			}
 			return err
 		})
 		if err != nil {
@@ -168,14 +191,18 @@ func (this *couchbaseSink) writeSingle(entry s.Entry, ch chan<- errAndKey) {
 }
 
 func (this *couchbaseSink) Ping() error {
-	res, err := this.bucket.Ping(this.config.UsedServices)
+	res, err := this.bucket.Ping(&gocb.PingOptions{
+		ServiceTypes: this.config.UsedServices,
+	})
 	if err != nil {
 		return err
 	}
 
-	for _, ser := range res.Services {
-		if !ser.Success {
-			return fmt.Errorf("failed to ping service: %+v", ser)
+	for _, serviceResults := range res.Services {
+		for _, result := range serviceResults {
+			if result.State != gocb.PingStateOk {
+				return fmt.Errorf("failed to ping service, error: %s", result.Error)
+			}
 		}
 	}
 
@@ -183,24 +210,16 @@ func (this *couchbaseSink) Ping() error {
 }
 
 func (this *couchbaseSink) connect() error {
-	cluster, err := gocb.Connect(this.config.Hosts)
-	if err != nil {
-		return err
-	}
-	this.cluster = cluster
-
-	err = cluster.Authenticate(gocb.PasswordAuthenticator{
+	cluster, err := gocb.Connect(this.config.Hosts, gocb.ClusterOptions{
 		Username: this.config.Username,
 		Password: this.config.Password,
 	})
 	if err != nil {
 		return err
 	}
+	this.cluster = cluster
 
-	bucket, err := cluster.OpenBucket(this.config.Bucket, this.config.BucketPassword)
-	if err != nil {
-		return err
-	}
+	bucket := cluster.Bucket(this.config.Bucket)
 	this.bucket = bucket
 
 	return this.Ping()
